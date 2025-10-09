@@ -1,7 +1,10 @@
 ﻿using BCrypt.Net;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using QuantamStore.Entities;
 using QuantamStore.Webapi.Data;
 using QuantamStore.Webapi.Models.AuthenticationDtos;
+using QuantamStore.Webapi.Services.Email;
 using QuantamStore.Webapi.Services.Jwt;
 using System;
 using System.Security.Claims;
@@ -12,12 +15,14 @@ public class AuthController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly IJwtService _jwtService;
-   
+    private readonly IEmailService _emailService;
 
-    public AuthController(ApplicationDbContext context, IJwtService jwtService)
+
+    public AuthController(ApplicationDbContext context, IJwtService jwtService,IEmailService emailService)
     {
         _context = context;
         _jwtService = jwtService;
+        _emailService = emailService;
     }
 
     private IActionResult IssueJwtAndRespond(User user, string message)
@@ -101,6 +106,52 @@ public class AuthController : ControllerBase
         return Ok(new { message = "Logged out" });
     }
 
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+        if (user == null)
+            return Ok(); // Don't reveal whether the email exists
+
+        var token = Guid.NewGuid().ToString();
+        var expiry = DateTime.UtcNow.AddMinutes(30);
+
+        var resetToken = new ForgotPasswordTokens
+        {
+            UserId = user.Id,
+            Token = token,
+            ExpiresAt = expiry
+        };
+
+        _context.ResetPasswordTokens.Add(resetToken);
+        await _context.SaveChangesAsync();
+
+        // Send email with reset link
+        var resetLink = $"http://localhost:3000/reset-password?token={token}";
+        await _emailService.SendAsync(user.Email, "Reset your password", $"Click here to reset your password: {resetLink}");
+
+        return Ok(new { message = "If your email exists, a reset link has been sent." });
+    }
+
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
+    {
+        var resetToken = await _context.ResetPasswordTokens
+            .Include(t => t.User)
+            .FirstOrDefaultAsync(t => t.Token == dto.Token && !t.IsUsed && t.ExpiresAt > DateTime.UtcNow);
+
+        if (resetToken == null)
+            return BadRequest("Invalid or expired token.");
+
+        // Update password
+        resetToken.User.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+        resetToken.IsUsed = true;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Password has been reset successfully." });
+    }
 
 
     [HttpGet("me")]
