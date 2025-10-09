@@ -1,0 +1,6 @@
+@QuantamStore.Webapi_HostAddress = http://localhost:5049
+
+GET {{QuantamStore.Webapi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,37 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36518.9
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantamStore.Webapi", "QuantamStore.Webapi\QuantamStore.Webapi.csproj", "{C33545E0-54CE-4138-909F-22CB66A639A6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantamStore.Entities", "QuantamStore.Entities\QuantamStore.Entities.csproj", "{9299A8E7-B6A8-445D-BDCE-F2F70E5B7212}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantamStore.Utilities", "QuantamStore.Utilities\QuantamStore.Utilities.csproj", "{04492330-D5BD-4C54-9C47-76078AD80059}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C33545E0-54CE-4138-909F-22CB66A639A6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C33545E0-54CE-4138-909F-22CB66A639A6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C33545E0-54CE-4138-909F-22CB66A639A6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C33545E0-54CE-4138-909F-22CB66A639A6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9299A8E7-B6A8-445D-BDCE-F2F70E5B7212}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9299A8E7-B6A8-445D-BDCE-F2F70E5B7212}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9299A8E7-B6A8-445D-BDCE-F2F70E5B7212}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9299A8E7-B6A8-445D-BDCE-F2F70E5B7212}.Release|Any CPU.Build.0 = Release|Any CPU
+		{04492330-D5BD-4C54-9C47-76078AD80059}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{04492330-D5BD-4C54-9C47-76078AD80059}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{04492330-D5BD-4C54-9C47-76078AD80059}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{04492330-D5BD-4C54-9C47-76078AD80059}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {E04E78D2-FAE2-491D-9810-E6D659FD3CEB}
+	EndGlobalSection
+EndGlobal
