@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using QuantamStore.Webapi.Data;
+using QuantamStore.Webapi.Services;
 using QuantamStore.Webapi.Services.Email;
 using QuantamStore.Webapi.Services.Jwt;
 using System.Text;
@@ -20,6 +21,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+builder.Services.AddScoped<UserValidator>();
 
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi

@@ -2,6 +2,7 @@
 using QuantamStore.Entities;
 using QuantamStore.Webapi.Data;
 using QuantamStore.Webapi.Models.UserDtos;
+using QuantamStore.Webapi.Services;
 
 namespace QuantamStore.Webapi.Controllers
 {
@@ -10,17 +11,48 @@ namespace QuantamStore.Webapi.Controllers
     public class UsersController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
-
-        public UsersController(ApplicationDbContext context)
+        private readonly UserValidator _validator;
+        public UsersController(ApplicationDbContext context, UserValidator validator)
         {
             _context = context;
         }
 
-        // GET: api/users
         [HttpGet]
-        public IActionResult GetUsers()
+        public IActionResult GetUsers(
+      [FromQuery] int page = 1,
+      [FromQuery] int pageSize = 10,
+      [FromQuery] string? search = null,
+      [FromQuery] string? role = null,
+      [FromQuery] string? status = null)
         {
-            var users = _context.Users
+            var query = _context.Users.AsQueryable();
+
+            // Soft delete filter
+            if (status == "deleted")
+                query = query.Where(u => u.IsDeleted);
+            else
+                query = query.Where(u => !u.IsDeleted);
+
+            // Search filter
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                query = query.Where(u =>
+                    u.Username.Contains(search) ||
+                    u.Email.Contains(search));
+            }
+
+            // Role filter
+            if (!string.IsNullOrWhiteSpace(role))
+            {
+                query = query.Where(u => u.Role == role);
+            }
+
+            var totalUsers = query.Count();
+
+            var users = query
+                .OrderBy(u => u.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Select(u => new {
                     u.Id,
                     u.Username,
@@ -30,14 +62,23 @@ namespace QuantamStore.Webapi.Controllers
                 })
                 .ToList();
 
-            return Ok(users);
+            return Ok(new
+            {
+                total = totalUsers,
+                page,
+                pageSize,
+                users
+            });
         }
+
+
+
 
         [HttpGet("{id}")]
         public IActionResult GetUserById(int id)
         {
             var user = _context.Users
-                .Where(u => u.Id == id)
+                .Where(u => u.Id == id && !u.IsDeleted)
                 .Select(u => new {
                     u.Id,
                     u.Username,
@@ -54,20 +95,17 @@ namespace QuantamStore.Webapi.Controllers
         }
 
 
+
         [HttpPost]
         public IActionResult CreateUser([FromBody] CreateUserDto dto)
         {
             // Check for existing email
-            if (_context.Users.Any(u => u.Email == dto.Email))
-            {
+            if (_validator.EmailExists(dto.Email))
                 return BadRequest(new { message = "Email already exists." });
-            }
 
             // Check for existing username
-            if (_context.Users.Any(u => u.Username == dto.Username))
-            {
+            if (_validator.UsernameExists(dto.Username))
                 return BadRequest(new { message = "Username already exists." });
-            }
 
             var user = new User
             {
@@ -97,15 +135,15 @@ namespace QuantamStore.Webapi.Controllers
         public IActionResult UpdateUser(int id, [FromBody] UpdateUserDto dto)
         {
             var user = _context.Users.Find(id);
-            if (user == null)
+            if (user == null || user.IsDeleted)
                 return NotFound(new { message = "User not found." });
 
             // Check for duplicate email
-            if (_context.Users.Any(u => u.Email == dto.Email && u.Id != id))
+            if (_validator.EmailExists(dto.Email, id))
                 return BadRequest(new { message = "Email already exists." });
 
             // Check for duplicate username
-            if (_context.Users.Any(u => u.Username == dto.Username && u.Id != id))
+            if (_validator.UsernameExists(dto.Username, id))
                 return BadRequest(new { message = "Username already exists." });
 
             user.Username = dto.Username;
@@ -125,18 +163,39 @@ namespace QuantamStore.Webapi.Controllers
         }
 
 
+
         [HttpDelete("{id}")]
-        public IActionResult DeleteUser(int id)
+        public IActionResult SoftDeleteUser(int id)
         {
             var user = _context.Users.Find(id);
             if (user == null)
                 return NotFound(new { message = "User not found." });
 
-            _context.Users.Remove(user);
+            if (user.IsDeleted)
+                return BadRequest(new { message = "User is already deleted." });
+
+            user.IsDeleted = true;
             _context.SaveChanges();
 
-            return NoContent();
+            return Ok(new { message = "User soft-deleted successfully." });
         }
+
+        [HttpPost("{id}/restore")]
+        public IActionResult RestoreUser(int id)
+        {
+            var user = _context.Users.Find(id);
+            if (user == null)
+                return NotFound(new { message = "User not found." });
+
+            if (!user.IsDeleted)
+                return BadRequest(new { message = "User is not deleted." });
+
+            user.IsDeleted = false;
+            _context.SaveChanges();
+
+            return Ok(new { message = "User restored successfully." });
+        }
+
 
     }
 }
