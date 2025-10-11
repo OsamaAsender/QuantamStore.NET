@@ -34,5 +34,26 @@ namespace QuantamStore.Webapi.Services.Email
 
             await smtpClient.SendMailAsync(mailMessage);
         }
+
+       public async Task SendResetPasswordEmail(string toEmail, string resetToken, DateTime expiresAt)
+{
+    var resetLink = $"https://yourdomain.com/reset-password?token={resetToken}";
+    var expiryFormatted = expiresAt.ToString("f"); // e.g., "Saturday, 11 October 2025 10:45 AM"
+
+    var subject = "Reset Your Password";
+    var body = $@"
+        You requested a password reset.
+
+        Click the link below to reset your password:
+        {resetLink}
+
+        ⚠️ This link will expire on: {expiryFormatted} (your local time)
+
+        If you didn’t request this, you can safely ignore this email.
+    ";
+
+    await SendAsync(toEmail, subject, body);
+}
+
     }
 }

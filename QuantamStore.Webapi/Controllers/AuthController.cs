@@ -139,12 +139,36 @@ public class AuthController : ControllerBase
     {
         var resetToken = await _context.ResetPasswordTokens
             .Include(t => t.User)
-            .FirstOrDefaultAsync(t => t.Token == dto.Token && !t.IsUsed && t.ExpiresAt > DateTime.UtcNow);
+            .FirstOrDefaultAsync(t => t.Token == dto.Token);
 
-        if (resetToken == null)
-            return BadRequest("Invalid or expired token.");
+        if (resetToken == null || resetToken.IsUsed || resetToken.ExpiresAt <= DateTime.UtcNow)
+        {
+            if (resetToken?.User != null)
+            {
+                // Generate new token
+                var newToken = new ForgotPasswordTokens
+                {
+                    Token = Guid.NewGuid().ToString(),
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(15),
+                    UserId = resetToken.User.Id
+                };
 
-        // Update password
+                _context.ResetPasswordTokens.Add(newToken);
+                await _context.SaveChangesAsync();
+
+                // Send email (pseudo-code)
+                await _emailService.SendResetPasswordEmail(resetToken.User.Email, newToken.Token,newToken.ExpiresAt);
+
+                return BadRequest(new
+                {
+                    message = "Your reset link has expired. A new reset email has been sent."
+                });
+            }
+
+            return BadRequest(new { message = "Invalid or expired token." });
+        }
+
+        // Proceed with password reset
         resetToken.User.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
         resetToken.IsUsed = true;
 
@@ -152,6 +176,7 @@ public class AuthController : ControllerBase
 
         return Ok(new { message = "Password has been reset successfully." });
     }
+
 
 
     [HttpGet("me")]
