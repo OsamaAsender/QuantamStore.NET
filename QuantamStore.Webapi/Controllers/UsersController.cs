@@ -15,6 +15,7 @@ namespace QuantamStore.Webapi.Controllers
         public UsersController(ApplicationDbContext context, UserValidator validator)
         {
             _context = context;
+            _validator = validator;
         }
 
         [HttpGet]
@@ -134,24 +135,39 @@ namespace QuantamStore.Webapi.Controllers
         [HttpPut("{id}")]
         public IActionResult UpdateUser(int id, [FromBody] UpdateUserDto dto)
         {
+            // Validate incoming data
+            if (dto == null || string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Username))
+            {
+                return BadRequest(new { message = "Invalid request." });
+            }
+
+            // Find the user
             var user = _context.Users.Find(id);
             if (user == null || user.IsDeleted)
+            {
                 return NotFound(new { message = "User not found." });
+            }
 
-            // Check for duplicate email
-            if (_validator.EmailExists(dto.Email, id))
+            // Check for duplicate email (excluding current user)
+            if (_validator.EmailExists(dto.Email, excludeUserId: id))
+            {
                 return BadRequest(new { message = "Email already exists." });
+            }
 
-            // Check for duplicate username
-            if (_validator.UsernameExists(dto.Username, id))
+            // Check for duplicate username (excluding current user)
+            if (_validator.UsernameExists(dto.Username, excludeUserId: id))
+            {
                 return BadRequest(new { message = "Username already exists." });
+            }
 
+            // Update fields
             user.Username = dto.Username;
             user.Email = dto.Email;
             user.Role = dto.Role;
 
             _context.SaveChanges();
 
+            // Return updated user info
             return Ok(new
             {
                 user.Id,
@@ -161,6 +177,7 @@ namespace QuantamStore.Webapi.Controllers
                 user.CreatedAt
             });
         }
+
 
 
 
