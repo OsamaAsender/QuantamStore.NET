@@ -7,6 +7,6 @@
         public decimal Price { get; set; }
         public int StockQuantity { get; set; }
         public int CategoryId { get; set; }
-        public IFormFile? Image { get; set; } // 👈 for image upload
+        public IFormFile? Image { get; set; } 
     }
 }

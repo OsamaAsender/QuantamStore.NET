@@ -20,35 +20,29 @@ namespace QuantamStore.Webapi.Controllers
 
         [HttpGet]
         public IActionResult GetProducts(
-      [FromQuery] int page = 1,
-      [FromQuery] int pageSize = 10,
-      [FromQuery] string? search = null,
-      [FromQuery] int? categoryId = null,
-      [FromQuery] string? status = null)
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? search = null,
+            [FromQuery] int? categoryId = null,
+            [FromQuery] string? status = null)
         {
             var query = _context.Products.AsQueryable();
 
-            // Soft delete filter
             if (status == "deleted")
                 query = query.Where(p => p.IsDeleted);
             else
                 query = query.Where(p => !p.IsDeleted);
 
-            // Search filter
             if (!string.IsNullOrWhiteSpace(search))
-            {
                 query = query.Where(p =>
                     p.Name.Contains(search) ||
                     p.Description.Contains(search));
-            }
 
-            // Category filter
             if (categoryId.HasValue)
-            {
                 query = query.Where(p => p.CategoryId == categoryId.Value);
-            }
 
             var total = query.Count();
+            var baseUrl = $"{Request.Scheme}://{Request.Host}";
 
             var products = query
                 .OrderBy(p => p.Id)
@@ -60,7 +54,8 @@ namespace QuantamStore.Webapi.Controllers
                     p.Name,
                     p.Description,
                     p.Price,
-                    p.ImageUrl,
+                    ImageUrl = string.IsNullOrEmpty(p.ImageUrl) ? null :
+                               (p.ImageUrl.StartsWith("http") ? p.ImageUrl : $"{baseUrl}{p.ImageUrl}"),
                     p.StockQuantity,
                     p.CategoryId,
                     CategoryName = p.Category.Name
@@ -70,10 +65,11 @@ namespace QuantamStore.Webapi.Controllers
             return Ok(new { total, page, pageSize, products });
         }
 
-
         [HttpGet("{id}")]
         public IActionResult GetProductById(int id)
         {
+            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+
             var product = _context.Products
                 .Where(p => p.Id == id && !p.IsDeleted)
                 .Select(p => new
@@ -82,7 +78,8 @@ namespace QuantamStore.Webapi.Controllers
                     p.Name,
                     p.Description,
                     p.Price,
-                    p.ImageUrl,
+                    ImageUrl = string.IsNullOrEmpty(p.ImageUrl) ? null :
+                               (p.ImageUrl.StartsWith("http") ? p.ImageUrl : $"{baseUrl}{p.ImageUrl}"),
                     p.StockQuantity,
                     p.CategoryId,
                     CategoryName = p.Category.Name
@@ -94,7 +91,6 @@ namespace QuantamStore.Webapi.Controllers
 
             return Ok(product);
         }
-
 
         [HttpPost]
         public async Task<IActionResult> CreateProduct([FromForm] CreateProductDto dto)
@@ -109,7 +105,8 @@ namespace QuantamStore.Webapi.Controllers
                 using var stream = new FileStream(path, FileMode.Create);
                 await dto.Image.CopyToAsync(stream);
 
-                imageUrl = $"/uploads/{fileName}";
+                var baseUrl = $"{Request.Scheme}://{Request.Host}";
+                imageUrl = $"{baseUrl}/uploads/{fileName}";
             }
 
             var product = new Product
@@ -123,58 +120,80 @@ namespace QuantamStore.Webapi.Controllers
             };
 
             _context.Products.Add(product);
-            _context.SaveChanges();
+            await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetProductById), new { id = product.Id }, product);
+            return CreatedAtAction(nameof(GetProductById), new { id = product.Id }, new
+            {
+                product.Id,
+                product.Name,
+                product.Description,
+                product.Price,
+                product.ImageUrl,   
+                stock = product.StockQuantity,
+                product.CategoryId,
+                categoryName = _context.Categories
+                 .Where(c => c.Id == product.CategoryId)
+                 .Select(c => c.Name)
+                 .FirstOrDefault()
+
+            });
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateProduct(int id, [FromForm] UpdateProductDto dto)
         {
-            var product = _context.Products.Find(id);
-            if (product == null)
+            var product = await _context.Products.FindAsync(id);
+            if (product == null || product.IsDeleted)
                 return NotFound(new { message = "Product not found." });
 
-            // Handle image replacement
             if (dto.Image != null)
             {
-                // Delete old image if it exists
+                var uploadPath = Path.Combine(_env.WebRootPath, "uploads");
+                if (!Directory.Exists(uploadPath))
+                    Directory.CreateDirectory(uploadPath);
+
                 if (!string.IsNullOrEmpty(product.ImageUrl))
                 {
-                    var oldImagePath = Path.Combine(_env.WebRootPath, product.ImageUrl.TrimStart('/'));
-                    if (System.IO.File.Exists(oldImagePath))
-                    {
-                        System.IO.File.Delete(oldImagePath);
-                    }
+                    var oldFileName = Path.GetFileName(product.ImageUrl);
+                    var oldPath = Path.Combine(uploadPath, oldFileName);
+                    if (System.IO.File.Exists(oldPath))
+                        System.IO.File.Delete(oldPath);
                 }
 
-                // Save new image
                 var fileName = Guid.NewGuid() + Path.GetExtension(dto.Image.FileName);
-                var newImagePath = Path.Combine(_env.WebRootPath, "uploads", fileName);
+                var path = Path.Combine(uploadPath, fileName);
 
-                using var stream = new FileStream(newImagePath, FileMode.Create);
+                using var stream = new FileStream(path, FileMode.Create);
                 await dto.Image.CopyToAsync(stream);
 
-                product.ImageUrl = $"/uploads/{fileName}";
+                var baseUrl = $"{Request.Scheme}://{Request.Host}";
+                product.ImageUrl = $"{baseUrl}/uploads/{fileName}";
             }
 
-            // Update other fields
             product.Name = dto.Name;
             product.Description = dto.Description;
             product.Price = dto.Price;
             product.StockQuantity = dto.StockQuantity;
             product.CategoryId = dto.CategoryId;
 
-            _context.SaveChanges();
+            await _context.SaveChangesAsync();
 
-            return Ok(product);
+            return Ok(new
+            {
+                product.Id,
+                product.Name,
+                product.Description,
+                product.Price,
+                product.ImageUrl,
+                product.StockQuantity,
+                product.CategoryId
+            });
         }
 
-
         [HttpDelete("{id}")]
-        public IActionResult SoftDeleteProduct(int id)
+        public async Task<IActionResult> SoftDeleteProduct(int id)
         {
-            var product = _context.Products.Find(id);
+            var product = await _context.Products.FindAsync(id);
             if (product == null)
                 return NotFound(new { message = "Product not found." });
 
@@ -182,15 +201,15 @@ namespace QuantamStore.Webapi.Controllers
                 return BadRequest(new { message = "Product is already deleted." });
 
             product.IsDeleted = true;
-            _context.SaveChanges();
+            await _context.SaveChangesAsync();
 
             return Ok(new { message = "Product soft-deleted successfully." });
         }
 
         [HttpPost("{id}/restore")]
-        public IActionResult RestoreProduct(int id)
+        public async Task<IActionResult> RestoreProduct(int id)
         {
-            var product = _context.Products.Find(id);
+            var product = await _context.Products.FindAsync(id);
             if (product == null)
                 return NotFound(new { message = "Product not found." });
 
@@ -198,11 +217,9 @@ namespace QuantamStore.Webapi.Controllers
                 return BadRequest(new { message = "Product is not deleted." });
 
             product.IsDeleted = false;
-            _context.SaveChanges();
+            await _context.SaveChangesAsync();
 
             return Ok(new { message = "Product restored successfully." });
         }
-
-
     }
 }

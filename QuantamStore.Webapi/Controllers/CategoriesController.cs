@@ -202,5 +202,21 @@ namespace QuantamStore.Webapi.Controllers
             return Ok(new { message = "Category restored successfully." });
         }
 
+        [HttpGet("dropdown")]
+        public IActionResult GetCategoryDropdown()
+        {
+            var categories = _context.Categories
+                .Where(c => !c.IsDeleted)
+                .Select(c => new
+                {
+                    value = c.Id.ToString(),
+                    label = c.Name
+                })
+                .ToList();
+
+            return Ok(categories);
+        }
+
+
     }
 }
