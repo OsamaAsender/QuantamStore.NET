@@ -179,8 +179,6 @@ namespace QuantamStore.Webapi.Controllers
         }
 
 
-
-
         [HttpDelete("{id}")]
         public IActionResult SoftDeleteUser(int id)
         {
