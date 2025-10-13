@@ -209,7 +209,7 @@ namespace QuantamStore.Webapi.Controllers
                 .Where(c => !c.IsDeleted)
                 .Select(c => new
                 {
-                    value = c.Id.ToString(),
+                    value = c.Id,
                     label = c.Name
                 })
                 .ToList();
