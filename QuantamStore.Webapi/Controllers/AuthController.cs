@@ -77,11 +77,14 @@ public class AuthController : ControllerBase
 
 
     [HttpPost("login")]
-    public IActionResult Login([FromBody] LoginDto dto)
+    public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
         try
         {
-            var (token, user) = _jwtService.LoginAsync(dto).Result;
+            var (token, user) = await _jwtService.LoginAsync(dto);
+
+            // 🆕 Ensure cart exists
+            await EnsureCartExists(user.Id);
 
             return _jwtService.IssueTokenResponse(user, Response, "Login successful.");
         }
@@ -90,6 +93,7 @@ public class AuthController : ControllerBase
             return Unauthorized(new { message = ex.Message });
         }
     }
+
 
 
     [HttpPost("logout")]
@@ -204,4 +208,25 @@ public class AuthController : ControllerBase
             role = user.Role
         });
     }
+
+    private async Task EnsureCartExists(int userId)
+    {
+        var existingCart = await _context.Carts
+            .FirstOrDefaultAsync(c => c.UserId == userId && c.Status == "Open");
+
+        if (existingCart == null)
+        {
+            var newCart = new Cart
+            {
+                UserId = userId,
+                Status = "Open",
+                CreatedAt = DateTime.UtcNow,
+                CartItems = new List<CartItem>()
+            };
+
+            _context.Carts.Add(newCart);
+            await _context.SaveChangesAsync();
+        }
+    }
+
 }

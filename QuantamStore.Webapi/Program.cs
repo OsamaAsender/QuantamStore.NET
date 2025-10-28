@@ -7,11 +7,10 @@ using QuantamStore.Webapi.Services;
 using QuantamStore.Webapi.Services.Email;
 using QuantamStore.Webapi.Services.Jwt;
 using System.Text;
+using System.Text.Json.Serialization;
 
 
 var builder = WebApplication.CreateBuilder(args);
-
-// Add services to the container.
 
 builder.Services.AddControllers();
 
@@ -22,7 +21,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 builder.Services.AddScoped<UserValidator>();
-
+builder.Services.AddHttpContextAccessor();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -44,7 +43,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = jwtSettings["Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(key)
         };
+
+        // ✅ This tells the middleware to read the token from the cookie
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                if (context.Request.Cookies.ContainsKey("jwt"))
+                {
+                    context.Token = context.Request.Cookies["jwt"];
+                }
+                return Task.CompletedTask;
+            }
+        };
     });
+
 builder.Services.AddAuthorization(options =>
     {
        options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
@@ -68,6 +81,7 @@ builder.Services.Configure<IpRateLimitPolicies>(builder.Configuration.GetSection
 
 builder.Services.AddInMemoryRateLimiting();
 builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+
 
 var app = builder.Build();
 
